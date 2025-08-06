@@ -1,0 +1,81 @@
+import discord
+from discord.ext.commands import *
+from assets import functions as func
+import traceback
+from datetime import datetime
+import asyncio
+from cogs.scheduler_commands import SchedulerCommands
+
+async def ScheduleWatcher(self):
+    await self.bot.wait_until_ready()
+    while not self.bot.is_closed():
+        datas = await func.DataFetch(self.bot, 'all', 'schedules')
+        if len(datas) != 0:
+            for data in datas:
+                try:
+                    time = datetime.strptime(data[1], '%Y-%m-%d %H:%M:%S.%f')
+                    if time <= datetime.utcnow():
+                        channel = self.bot.get_channel(data[10])
+                        if channel is None:
+                            # Channel not found, remove this schedule
+                            try:
+                                await func.DataUpdate(self.bot, f"DELETE FROM schedules WHERE guild_id = {data[0]} and num = {data[9]}")
+                            except:
+                                pass
+                            continue
+                        if data[3] == 0:
+                            if data[7] != "None":
+                                attachment = f"\n\n{data[7]}"
+                            else:
+                                attachment = ""
+                            await channel.send(data[2]+attachment)
+                        else:
+                            embed = discord.Embed()
+                            if data[2] != "None":
+                                embed.description = data[2]
+                            if data[4] != "None":
+                                embed.title = data[4]
+                            if data[5] != "None":
+                                embed.set_footer(text=data[5])
+                            if data[6] != "None":
+                                try:
+                                    if 'https' in data[6] or 'http' in data[6]:
+                                        embed.set_thumbnail(url=data[6])
+                                except:
+                                    pass
+                            if data[7] != "None":
+                                if data[7] != "None" and isinstance(data[7], str) and (data[7].startswith("http://") or data[7].startswith("https://")):
+                                    try:
+                                        embed.set_image(url=data[7])
+                                    except:
+                                        pass
+                            if data[8] != "None":
+                                try:
+                                    embed.color = int(data[8])
+                                except Exception:
+                                    embed.color = discord.Color.default()
+                            await channel.send(embed=embed)
+                        loop_integer = data[11]
+                        if loop_integer != 0:
+                            loop_integer -= 1
+                            if loop_integer <= 0:
+                                await func.DataUpdate(self.bot, f"DELETE FROM schedules WHERE guild_id = {data[0]} and num = {data[9]}")
+                                guild_datas = await func.DataFetch(self.bot, 'all', 'schedules', data[0])
+                                for i, guild_data in enumerate(guild_datas):
+                                    await func.DataUpdate(self.bot, f"UPDATE schedules SET num = {i+1} WHERE guild_id = {data[0]} and num = {guild_data[9]}")
+                                continue
+                        time = await SchedulerCommands.CheckDuration(self, data[12])
+                        await func.DataUpdate(self.bot, f"UPDATE schedules SET time = ?, loop_integer = ? WHERE guild_id = {data[0]} and num = {data[9]}", time, loop_integer)
+                except:
+                    print(traceback.format_exc())
+
+        await asyncio.sleep(10)
+
+
+class SchedulerSystem(Cog):
+    def __init__(self, bot):
+        self.bot = bot
+        self.bot.loop.create_task(ScheduleWatcher(self))
+
+def setup(bot):
+    bot.add_cog(SchedulerSystem(bot))

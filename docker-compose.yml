@@ -1,0 +1,11 @@
+version: '3.8'
+services:
+  schedulerbot:
+    build: .
+    container_name: schedulerbot
+    restart: always
+    environment:
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - .:/app
+    command: python main.py

@@ -22,12 +22,17 @@ async def CheckAdmin(ctx):
         await ctx.send(embed=func.ErrorEmbed('Server Only', 'This bot only works in servers, not in DMs.'))
         return False
     
-    # Check if author is a Member object with guild permissions
-    if hasattr(ctx.author, 'guild_permissions') and ctx.author.guild_permissions.administrator:
+    # Check if author is admin or has 'executives' role
+    member = ctx.author
+    if hasattr(member, 'guild_permissions') and member.guild_permissions.administrator:
         return True
-    else:
-        await ctx.send(embed=func.ErrorEmbed('Missing Permissions', 'You are missing permissions. You need to have `administrator` permission in order to use this bot.'))
-        return False
+    # Check for 'executives' role (case-insensitive)
+    if hasattr(member, 'roles'):
+        for role in member.roles:
+            if role.name == 'Executives':
+                return True
+    await ctx.send(embed=func.ErrorEmbed('Missing Permissions', 'You are missing permissions. You need to have `administrator` permission or the `executives` role to use this bot.'))
+    return False
 
 bot.remove_command('help')
 bot.check_once(CheckAdmin)
